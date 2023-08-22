@@ -9,8 +9,9 @@ from diffusers import (
     FlaxAutoencoderKL,
     FlaxDDIMScheduler,
     FlaxStableDiffusionPipeline,
-    FlaxUNet2DConditionModel,
+    # FlaxUNet2DConditionModel,
 )
+from models import FlaxUNet2DConditionModel
 
 from transformers import CLIPFeatureExtractor, CLIPTokenizer, FlaxCLIPTextModel
 
