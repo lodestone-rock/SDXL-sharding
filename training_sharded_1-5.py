@@ -1,8 +1,10 @@
 
 import json
 import ast
+import gc
 
 import jax
+import jaxlib
 import jax.numpy as jnp
 import numpy as np
 from PIL import Image
@@ -24,6 +26,21 @@ import diffusers.schedulers.scheduling_ddim_flax
 
 from jax.experimental import mesh_utils
 from jax.sharding import PositionalSharding
+
+from jax.sharding import Mesh
+from jax.sharding import PartitionSpec
+from jax.sharding import NamedSharding
+from jax.experimental import mesh_utils
+
+P = PartitionSpec
+# adjust this sharding mesh to create appropriate sharding rule
+# assume we have 8 device
+# (1,8) = model parallel
+# (8,1) = data parallel
+# (4,2)/(2,4) = model data parallel
+devices = mesh_utils.create_device_mesh((1,8))
+mesh = Mesh(devices, axis_names=('dp', 'mp')) 
+
 
 # global var
 adam_to_lion_scale_factor = 7
@@ -104,6 +121,28 @@ def predefined_sharding(layouts:dict) -> dict:
     layouts = jax.tree_map(lambda x: _convert(ast.literal_eval(x)), layouts)
     return layouts
 
+# convert it as actual sharding 
+def predefined_mesh_sharding(layouts:dict) -> dict:
+    # convert string like (None, 'mp') to actual tuple and turn it to sharding rule
+    def _convert(param):
+        param = NamedSharding(mesh, P(*param))
+        return param
+    layouts = jax.tree_map(lambda x: _convert(ast.literal_eval(x)), layouts)
+    return layouts
+
+def shard_remainder_state_param(param_leaf):
+    # if it already sharded then ignore it
+    if hasattr(param_leaf, "sharding"):
+        # if it's not sharded then shard it
+        if type(param_leaf.sharding) == jaxlib.xla_extension.SingleDeviceSharding:
+            shard_rule = NamedSharding(mesh, P())
+        else:
+            shard_rule = param_leaf.sharding
+    # shard / replicate pesky remainder params
+    else:
+        shard_rule = NamedSharding(mesh, P())
+    return shard_rule
+
 
 def all_same_bool_values(d):
     values = set()
@@ -151,16 +190,18 @@ noise_scheduler_state = noise_scheduler.create_state()
 # vae_params = jax.tree_map(shard_weight_column, vae_params)
 
 # grab tree sharding layout for each layer
-unet_params_shard_layout = read_json_file("unet_state_layout.json")
+unet_params_shard_layout = read_json_file("unet_sharding_layout.json")
 text_encoder_shard_layout = read_json_file("clip_sharding_layout.json")
-vae_params_shard_layout = read_json_file("vae_state_layout.json")
+vae_params_shard_layout = read_json_file("vae_sharding_layout.json")
 
-unet_params_shard_layout = predefined_sharding(unet_params_shard_layout)
-text_encoder_shard_layout = predefined_sharding(text_encoder_shard_layout)
-vae_params_shard_layout = predefined_sharding(vae_params_shard_layout)
+unet_params_shard_layout = predefined_mesh_sharding(unet_params_shard_layout)
+text_encoder_shard_layout = predefined_mesh_sharding(text_encoder_shard_layout)
+vae_params_shard_layout = predefined_mesh_sharding(vae_params_shard_layout)
 
 # jax.profiler.start_trace("./tensorboard")
 
+# NOTE: there's must be a way to define shard without materializing this to TPU!
+# init the state in cpu first then manually shard the state perhaps hmmm
 unet_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), unet_params, unet_params_shard_layout)
 text_encoder_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), text_encoder_params, text_encoder_shard_layout)
 vae_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), vae_params, vae_params_shard_layout)
@@ -202,14 +243,17 @@ unet_state = train_state.TrainState.create(
     params=unet_params,
     tx=u_net_optimizer
 )
-del unet_params
 
 text_encoder_state = train_state.TrainState.create(
     apply_fn=text_encoder.__call__,
     params=text_encoder_params,
     tx=text_encoder_optimizer
 )
+
+# delete previous params because state creates a copy of it and occupy a memory
+del unet_params
 del text_encoder_params
+gc.collect()
 
 def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.random.PRNGKey):
     # generate rng and return new_train_rng to be used for the next iteration step
@@ -357,16 +401,14 @@ def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.
         grads=grad["text_encoder"])
 
     # calculate loss
-    metrics = {"loss": loss}
+    # metrics = {"loss": loss}
 
-    return new_unet_state, new_text_encoder_state, metrics, new_train_rng
+    return new_unet_state, new_text_encoder_state, new_train_rng # metrics
 
 # ===============[compile to device]=============== #
 
 
 jax.profiler.start_trace("./tensorboard")
-p_train_step = jax.jit(train_step)# , donate_argnums=(0, 1))
-
 
 train_rngs = rng(2)
 # dummy batch input
@@ -375,12 +417,43 @@ current_batch = {
     'input_ids': jnp.arange(1 * 3 * 77).reshape(1 * 3, 77), 
     'pixel_values': jax.random.uniform(train_rngs, shape=(1 * 1, 3, 1088, 1088))
 }
+# current_batch_shard_layout = {
+#     'attention_mask': sharding.replicate(), 
+#     'input_ids': sharding.replicate(), 
+#     'pixel_values': sharding.replicate()
+# }
+current_batch_shard_layout = {
+    'attention_mask': NamedSharding(mesh, P()), 
+    'input_ids': NamedSharding(mesh, P()), 
+    'pixel_values': NamedSharding(mesh, P()),
+}
+
+
+p_train_step = jax.jit(
+    train_step , 
+    donate_argnums=(0, 1), 
+    in_shardings=(
+        jax.tree_map(lambda x: shard_remainder_state_param(x), unet_state),
+        jax.tree_map(lambda x: shard_remainder_state_param(x), text_encoder_state),
+        jax.tree_map(lambda x: shard_remainder_state_param(x), vae_params),
+        current_batch_shard_layout,
+        NamedSharding(mesh, P()),# sharding.replicate()
+    ),
+    out_shardings=(
+        jax.tree_map(lambda x: shard_remainder_state_param(x), unet_state),
+        jax.tree_map(lambda x: shard_remainder_state_param(x), text_encoder_state),
+        # sharding.replicate(), # i think this must be identical to loss output which is dict
+        NamedSharding(mesh, P()), # sharding.replicate() # not sure about this 
+    )
+)
+
+
 
 batch = jax.tree_map(
     lambda x: jax.device_put(x, device=sharding.replicate()), current_batch
 )
 
-unet_state, text_encoder_state, train_metric, train_rngs = p_train_step(
+unet_state, text_encoder_state, train_rngs = p_train_step(
     unet_state,
     text_encoder_state,
     vae_params,
