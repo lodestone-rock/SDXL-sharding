@@ -576,8 +576,8 @@
         }
     },
     "post_quant_conv": {
-        "bias": "None",
-        "kernel": "None"
+        "bias": "(None,)",
+        "kernel": "(None,)"
     },
     "quant_conv": {
         "bias": "('mp',)",
