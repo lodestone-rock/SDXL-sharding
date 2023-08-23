@@ -1,3 +1,7 @@
+
+import json
+import ast
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -38,8 +42,19 @@ use_offset_noise = False
 strip_bos_eos_token = True
 
 
+def read_json_file(file_path):
+    try:
+        with open(file_path, 'r') as json_file:
+            data_dict = json.load(json_file)
+        return data_dict
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
+    except json.JSONDecodeError:
+        print(f"Error decoding JSON in file: {file_path}")
+        return None
+
 def save_model_tree_as_json(file_name: str, params: dict) -> None:
-    import json
 
     # Save the dictionary as JSON
     with open(file_name, "w") as json_file:
@@ -76,6 +91,20 @@ def shard_weight_column(model_params: jnp.array):
 
     return model_params
 
+
+# convert it as actual sharding 
+def predefined_sharding(layouts:dict) -> dict:
+    # convert list as sharding and none as replicate
+    def _convert(param):
+        if param != None:
+            param = sharding.reshape(param)
+        else:
+            param = sharding.replicate() 
+        return param
+    layouts = jax.tree_map(lambda x: _convert(ast.literal_eval(x)), layouts)
+    return layouts
+
+
 def all_same_bool_values(d):
     values = set()
     for v in d.values():
@@ -93,7 +122,7 @@ model_dir = "/home/teor/secondary_storage/tpu8/model/fluffyrock-576-704-832-960-
 tokenizer = CLIPTokenizer.from_pretrained(model_dir, subfolder="tokenizer")
 
 unet, unet_params = FlaxUNet2DConditionModel.from_pretrained(
-    model_dir, subfolder="unet", dtype=jnp.bfloat16, #use_memory_efficient=True
+    model_dir, subfolder="unet", dtype=jnp.bfloat16, use_memory_efficient=True
 )
 
 text_encoder, text_encoder_params = FlaxCLIPTextModel.from_pretrained(
@@ -117,9 +146,24 @@ noise_scheduler = FlaxDDPMScheduler(
 noise_scheduler_state = noise_scheduler.create_state()
 
 # shard the weights across device
-unet_params = jax.tree_map(shard_weight_column, unet_params)
-text_encoder_params = jax.tree_map(shard_weight_column, text_encoder_params)
-vae_params = jax.tree_map(shard_weight_column, vae_params)
+# unet_params = jax.tree_map(shard_weight_column, unet_params)
+# text_encoder_params = jax.tree_map(shard_weight_column, text_encoder_params)
+# vae_params = jax.tree_map(shard_weight_column, vae_params)
+
+# grab tree sharding layout for each layer
+unet_params_shard_layout = read_json_file("unet_state_layout.json")
+text_encoder_shard_layout = read_json_file("clip_sharding_layout.json")
+vae_params_shard_layout = read_json_file("vae_state_layout.json")
+
+unet_params_shard_layout = predefined_sharding(unet_params_shard_layout)
+text_encoder_shard_layout = predefined_sharding(text_encoder_shard_layout)
+vae_params_shard_layout = predefined_sharding(vae_params_shard_layout)
+
+# jax.profiler.start_trace("./tensorboard")
+
+unet_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), unet_params, unet_params_shard_layout)
+text_encoder_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), text_encoder_params, text_encoder_shard_layout)
+vae_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), vae_params, vae_params_shard_layout)
 
 u_net_constant_scheduler = optax.constant_schedule(
     u_net_learning_rate / adam_to_lion_scale_factor
@@ -158,12 +202,14 @@ unet_state = train_state.TrainState.create(
     params=unet_params,
     tx=u_net_optimizer
 )
+del unet_params
 
 text_encoder_state = train_state.TrainState.create(
     apply_fn=text_encoder.__call__,
     params=text_encoder_params,
     tx=text_encoder_optimizer
 )
+del text_encoder_params
 
 def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.random.PRNGKey):
     # generate rng and return new_train_rng to be used for the next iteration step
@@ -317,7 +363,9 @@ def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.
 
 # ===============[compile to device]=============== #
 
-p_train_step = jax.jit(train_step)
+
+jax.profiler.start_trace("./tensorboard")
+p_train_step = jax.jit(train_step)# , donate_argnums=(0, 1))
 
 
 train_rngs = rng(2)
@@ -325,7 +373,7 @@ train_rngs = rng(2)
 current_batch = {
     'attention_mask': jnp.arange(1 * 1 * 3 * 77).reshape(1 * 1, 3, 77), 
     'input_ids': jnp.arange(1 * 3 * 77).reshape(1 * 3, 77), 
-    'pixel_values': jax.random.uniform(train_rngs, shape=(1 * 1, 3, 512, 512))
+    'pixel_values': jax.random.uniform(train_rngs, shape=(1 * 1, 3, 1088, 1088))
 }
 
 batch = jax.tree_map(
@@ -339,6 +387,6 @@ unet_state, text_encoder_state, train_metric, train_rngs = p_train_step(
     batch,
     train_rngs
 )
-
+jax.profiler.stop_trace()
 
 print()
