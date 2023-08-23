@@ -5,3 +5,6 @@
 /tensorboard
 *.json
 __pycache__
+!clip_sharding_layout.json
+!unet_sharding_layout.json
+!vae_sharding_layout.json

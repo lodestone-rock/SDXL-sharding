@@ -1,0 +1,476 @@
+{
+    "text_model": {
+        "embeddings": {
+            "position_embedding": {
+                "embedding": "(None,'mp',)"
+            },
+            "token_embedding": {
+                "embedding": "(None,'mp',)"
+            }
+        },
+        "encoder": {
+            "layers": {
+                "0": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "1": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "10": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "11": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "2": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "3": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "4": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "5": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "6": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "7": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "8": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                },
+                "9": {
+                    "layer_norm1": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "layer_norm2": {
+                        "bias": "('mp',)",
+                        "scale": "('mp',)"
+                    },
+                    "mlp": {
+                        "fc1": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "fc2": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    },
+                    "self_attn": {
+                        "k_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "out_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "q_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        },
+                        "v_proj": {
+                            "bias": "('mp',)",
+                            "kernel": "(None,'mp',)"
+                        }
+                    }
+                }
+            }
+        },
+        "final_layer_norm": {
+            "bias": "('mp',)",
+            "scale": "('mp',)"
+        }
+    }
+}

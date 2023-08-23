@@ -1,0 +1,586 @@
+{
+    "decoder": {
+        "conv_in": {
+            "bias": "('mp',)",
+            "kernel": "(None,None,None,'mp',)"
+        },
+        "conv_norm_out": {
+            "bias": "('mp',)",
+            "scale": "('mp',)"
+        },
+        "conv_out": {
+            "bias": "(None,)",
+            "kernel": "(None,None,None,None,)"
+        },
+        "mid_block": {
+            "attentions_0": {
+                "group_norm": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "key": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,'mp',)"
+                },
+                "proj_attn": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,'mp',)"
+                },
+                "query": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,'mp',)"
+                },
+                "value": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,'mp',)"
+                }
+            },
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            }
+        },
+        "up_blocks_0": {
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_2": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "upsamplers_0": {
+                "conv": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                }
+            }
+        },
+        "up_blocks_1": {
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_2": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "upsamplers_0": {
+                "conv": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                }
+            }
+        },
+        "up_blocks_2": {
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv_shortcut": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_2": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "upsamplers_0": {
+                "conv": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                }
+            }
+        },
+        "up_blocks_3": {
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv_shortcut": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_2": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            }
+        }
+    },
+    "encoder": {
+        "conv_in": {
+            "bias": "('mp',)",
+            "kernel": "(None,None,None,'mp',)"
+        },
+        "conv_norm_out": {
+            "bias": "('mp',)",
+            "scale": "('mp',)"
+        },
+        "conv_out": {
+            "bias": "('mp',)",
+            "kernel": "(None,None,None,'mp',)"
+        },
+        "down_blocks_0": {
+            "downsamplers_0": {
+                "conv": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                }
+            },
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            }
+        },
+        "down_blocks_1": {
+            "downsamplers_0": {
+                "conv": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                }
+            },
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv_shortcut": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            }
+        },
+        "down_blocks_2": {
+            "downsamplers_0": {
+                "conv": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                }
+            },
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv_shortcut": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            }
+        },
+        "down_blocks_3": {
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            }
+        },
+        "mid_block": {
+            "attentions_0": {
+                "group_norm": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "key": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,'mp',)"
+                },
+                "proj_attn": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,'mp',)"
+                },
+                "query": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,'mp',)"
+                },
+                "value": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,'mp',)"
+                }
+            },
+            "resnets_0": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            },
+            "resnets_1": {
+                "conv1": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "conv2": {
+                    "bias": "('mp',)",
+                    "kernel": "(None,None,None,'mp',)"
+                },
+                "norm1": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                },
+                "norm2": {
+                    "bias": "('mp',)",
+                    "scale": "('mp',)"
+                }
+            }
+        }
+    },
+    "post_quant_conv": {
+        "bias": "None",
+        "kernel": "None"
+    },
+    "quant_conv": {
+        "bias": "('mp',)",
+        "kernel": "(None,None,None,'mp',)"
+    }
+}
