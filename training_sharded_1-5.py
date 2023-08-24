@@ -401,21 +401,21 @@ def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.
         grads=grad["text_encoder"])
 
     # calculate loss
-    # metrics = {"loss": loss}
+    metrics = {"loss": loss}
 
-    return new_unet_state, new_text_encoder_state, new_train_rng # metrics
+    return new_unet_state, new_text_encoder_state, metrics, new_train_rng # 
 
 # ===============[compile to device]=============== #
 
 
-jax.profiler.start_trace("./tensorboard")
+# jax.profiler.start_trace("./tensorboard")
 
 train_rngs = rng(2)
 # dummy batch input
 current_batch = {
-    'attention_mask': jnp.arange(1 * 1 * 3 * 77).reshape(1 * 1, 3, 77), 
-    'input_ids': jnp.arange(1 * 3 * 77).reshape(1 * 3, 77), 
-    'pixel_values': jax.random.uniform(train_rngs, shape=(1 * 1, 3, 1088, 1088))
+    'attention_mask': jnp.arange(2 * 1 * 3 * 77).reshape(2 * 1, 3, 77), 
+    'input_ids': jnp.arange(2 * 3 * 77).reshape(2 * 3, 77), 
+    'pixel_values': jax.random.uniform(train_rngs, shape=(2 * 1, 3, 512, 512))
 }
 # current_batch_shard_layout = {
 #     'attention_mask': sharding.replicate(), 
@@ -442,7 +442,7 @@ p_train_step = jax.jit(
     out_shardings=(
         jax.tree_map(lambda x: shard_remainder_state_param(x), unet_state),
         jax.tree_map(lambda x: shard_remainder_state_param(x), text_encoder_state),
-        # sharding.replicate(), # i think this must be identical to loss output which is dict
+        {"loss":  NamedSharding(mesh, P())},
         NamedSharding(mesh, P()), # sharding.replicate() # not sure about this 
     )
 )
@@ -453,13 +453,13 @@ batch = jax.tree_map(
     lambda x: jax.device_put(x, device=sharding.replicate()), current_batch
 )
 
-unet_state, text_encoder_state, train_rngs = p_train_step(
+unet_state, text_encoder_state, metrics, train_rngs = p_train_step(
     unet_state,
     text_encoder_state,
     vae_params,
     batch,
     train_rngs
 )
-jax.profiler.stop_trace()
+# jax.profiler.stop_trace()
 
 print()
