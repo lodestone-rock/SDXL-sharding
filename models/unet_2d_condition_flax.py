@@ -23,7 +23,7 @@ from diffusers.configuration_utils import ConfigMixin, flax_register_to_config
 from diffusers.utils import BaseOutput
 from diffusers.models.embeddings_flax import FlaxTimestepEmbedding, FlaxTimesteps
 from diffusers.models.modeling_flax_utils import FlaxModelMixin
-from diffusers.models.unet_2d_blocks_flax import (
+from models.unet_2d_blocks_flax import (
     FlaxCrossAttnDownBlock2D,
     FlaxCrossAttnUpBlock2D,
     FlaxDownBlock2D,
@@ -32,9 +32,19 @@ from diffusers.models.unet_2d_blocks_flax import (
 )
 
 # gonna put this temporarily here (famous last words)
+from jax.sharding import Mesh
+from jax.sharding import PartitionSpec
+from jax.sharding import NamedSharding
 from jax.experimental import mesh_utils
-from jax.sharding import PositionalSharding
-sharding = PositionalSharding(mesh_utils.create_device_mesh((jax.device_count(),)))
+
+P = PartitionSpec
+# adjust this sharding mesh to create appropriate sharding rule
+# assume we have 8 device
+# (1,8) = model parallel
+# (8,1) = data parallel
+# (4,2)/(2,4) = model data parallel
+devices = mesh_utils.create_device_mesh((1,8))
+mesh = Mesh(devices, axis_names=('dp', 'mp')) 
 
 @flax.struct.dataclass
 class FlaxUNet2DConditionOutput(BaseOutput):
@@ -306,6 +316,7 @@ class FlaxUNet2DConditionModel(nn.Module, FlaxModelMixin, ConfigMixin):
 
         # 2. pre-process
         sample = jnp.transpose(sample, (0, 2, 3, 1))
+        sample = jax.lax.with_sharding_constraint(sample, shardings=NamedSharding(mesh, P()))
         sample = self.conv_in(sample)
 
         # 3. down
@@ -352,11 +363,11 @@ class FlaxUNet2DConditionModel(nn.Module, FlaxModelMixin, ConfigMixin):
         # 6. post-process
         sample = self.conv_norm_out(sample)
         sample = nn.silu(sample)
-        sample = jax.lax.with_sharding_constraint(sample, shardings=sharding.replicate())
+        sample = jax.lax.with_sharding_constraint(sample, shardings=NamedSharding(mesh, P()))
         sample = self.conv_out(sample)
-        sample = jax.lax.with_sharding_constraint(sample, shardings=sharding.replicate())
+        sample = jax.lax.with_sharding_constraint(sample, shardings=NamedSharding(mesh, P()))
         sample = jnp.transpose(sample, (0, 3, 1, 2))
-        sample = jax.lax.with_sharding_constraint(sample, shardings=sharding.replicate())
+        sample = jax.lax.with_sharding_constraint(sample, shardings=NamedSharding(mesh, P()))
 
         if not return_dict:
             return (sample,)
