@@ -69,7 +69,7 @@ def shard_weight_column(model_params: jnp.array):
     return model_params
 
 
-model_dir = "/home/teor/main_storage/tpu3/model/fluffyrock-576-704-832-960-1088-lion-e135"
+model_dir = "/home/teor/main_storage/tpu3/model/fluffyrock-576-704-832-960-1088-lion-e144"
 # load the model params and model object
 
 tokenizer = CLIPTokenizer.from_pretrained(model_dir, subfolder="tokenizer")
