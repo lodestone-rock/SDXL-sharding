@@ -219,7 +219,7 @@ text_encoder, text_encoder_params = FlaxCLIPTextModel.from_pretrained(
 )
 
 text_encoder_2, text_encoder_2_params = FlaxCLIPTextModelWithProjection.from_pretrained(
-    model_dir, subfolder="text_encoder", dtype=jnp.bfloat16, _do_init=False
+    model_dir, subfolder="text_encoder_2", dtype=jnp.bfloat16, _do_init=False
 )
 
 
@@ -314,29 +314,36 @@ text_encoder_state = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_b
 # not trained
 text_encoder_2_params = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(text_encoder_2_shard_layout, (path, leaf)),text_encoder_2_params)
 vae_params = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(vae_params_shard_layout, (path, leaf)),vae_params)
+# cast as bf16 since it's not trained
+text_encoder_2_params = jax.tree_map(lambda leaf: leaf.astype(jnp.bfloat16),text_encoder_2_params)
+vae_params = jax.tree_map(lambda leaf: leaf.astype(jnp.bfloat16),vae_params)
 # delete previous params because state creates a copy of it and occupy a memory
 # del unet_params
 # del text_encoder_params
 # gc.collect()
 
-def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.random.PRNGKey):
+def train_step(unet_state, text_encoder_state, text_encoder_2_params, vae_params, batch, train_rng:jax.random.PRNGKey):
     # generate rng and return new_train_rng to be used for the next iteration step
     # rng is comunicated though device aparently
     dropout_rng, sample_rng, new_train_rng = jax.random.split(
         train_rng, num=3)
 
 
-    # trainable params is passed as an argument while 
-    # non trainable params are implicitly referenced in loss calculation
+    # trainable params 
     params = {
         "text_encoder": text_encoder_state.params,
         "unet": unet_state.params
     }
-
-    def compute_loss(params):
-        # Convert images to latent space
+    # frozen params put in dict so it's clear and not implicitly referenced
+    frozen_params = {
+        "text_encoder_2": text_encoder_2_params,
+        "vae": vae_params
+    }
+    # i set autograd only calculate the first params in this case so the second params is frozen
+    def compute_loss(params, frozen_params):
+        ### Convert images to latent space and noise the heck out of it ###
         vae_outputs = vae.apply(
-            {"params": vae_params},
+            {"params": frozen_params["vae"]},
             batch["pixel_values"],
             deterministic=True,
             method=vae.encode
@@ -346,15 +353,15 @@ def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.
         latents = vae_outputs.latent_dist.sample(sample_rng)
         # (NHWC) -> (NCHW)
         latents = jnp.transpose(latents, (0, 3, 1, 2))
-        # weird scaling don't touch it's a lazy normalization
-        latents = latents * 0.18215
+        #scaling factor is in the config so grab from that (still lazy norm thinggy)
+        latents = latents * vae.config.scaling_factor
 
         # Sample noise that we'll add to the latents
         # I think I should combine this with the first noise seed generator
         noise_offset_rng, noise_rng, timestep_rng = jax.random.split(
             sample_rng, num=3)
         noise = jax.random.normal(noise_rng, latents.shape)
-        if use_offset_noise:
+        if use_offset_noise: # unsused
             # mean offset noise, why add offset?
             # here https://www.crosslabs.org//blog/diffusion-with-offset-noise
             noise_offset = jax.random.normal(
@@ -364,10 +371,10 @@ def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.
             noise = noise + noise_offset
 
         # Sample a random timestep for each image
-        bsz = latents.shape[0]
+        batch_size = latents.shape[0]
         timesteps = jax.random.randint(
             timestep_rng,
-            (bsz,),
+            (batch_size,),
             0,
             noise_scheduler.config.num_train_timesteps,
         )
@@ -380,57 +387,124 @@ def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.
             noise,
             timesteps
         )
-        print(batch["input_ids"].shape)
-        encoder_hidden_states = text_encoder_state.apply_fn(
-            batch["input_ids"],
-            params=params["text_encoder"],
-            dropout_rng=dropout_rng,
-            train=True
-        )[0]
-        print(encoder_hidden_states.shape)
-        # reshape encoder_hidden_states to shape (batch, token_append, token, hidden_states)
-        encoder_hidden_states = jnp.reshape(
-            encoder_hidden_states,
-            (latents.shape[0], -1, 77, encoder_hidden_states.shape[-1]),
-        )
-        print(encoder_hidden_states.shape)
 
-        if strip_bos_eos_token:
-            encoder_hidden_states = jnp.concatenate(
-                [
-                    # first encoder hidden states without eos token
-                    encoder_hidden_states[:, 0, :-1, :],
-                    # the rest of encoder hidden states without both bos and eos token
-                    jnp.reshape(
-                        encoder_hidden_states[:, 1:-1, 1:-1, :],
-                        (
-                            encoder_hidden_states.shape[0],
-                            -1,
-                            encoder_hidden_states.shape[-1]
-                        )
-                    ),
-                    # last encoder hidden states without bos token
-                    encoder_hidden_states[:, -1, 1:, :]
-                ],
-                axis=1
-            )
-        else:
-            # reshape encoder_hidden_states to shape (batch, token_append & token, hidden_states)
+        ### text embedding guidance ###
+        def _concatenate_text_encoder_latent(
+            encoder_hidden_states:jnp.array, 
+            batch_size:int=batch_size,
+            strip_bos_eos_token:bool=strip_bos_eos_token
+        ):
+            # i put batch size value as default :P
+            # this is a hacky way from automatic1111 to extend context length and usefull during training
+            # since the context length is not easily extendable due to trained positional embedding
+            # reshape encoder_hidden_states to shape (batch, token_append, token, hidden_states)
             encoder_hidden_states = jnp.reshape(
                 encoder_hidden_states,
-                (encoder_hidden_states.shape[0], -
-                    1, encoder_hidden_states.shape[-1])
+                (
+                    batch_size, 
+                    -1, 
+                    77, 
+                    encoder_hidden_states.shape[-1]
+                ),
             )
-        print(encoder_hidden_states.shape)
+            print(encoder_hidden_states.shape)
 
+            if strip_bos_eos_token:
+                encoder_hidden_states = jnp.concatenate(
+                    [
+                        # first encoder hidden states without eos token
+                        encoder_hidden_states[:, 0, :-1, :],
+                        # the rest of encoder hidden states without both bos and eos token
+                        jnp.reshape(
+                            encoder_hidden_states[:, 1:-1, 1:-1, :],
+                            (
+                                encoder_hidden_states.shape[0],
+                                -1,
+                                encoder_hidden_states.shape[-1]
+                            )
+                        ),
+                        # last encoder hidden states without bos token
+                        encoder_hidden_states[:, -1, 1:, :]
+                    ],
+                    axis=1
+                )
+            else:
+                # reshape encoder_hidden_states to shape (batch, token_append & token, hidden_states)
+                encoder_hidden_states = jnp.reshape(
+                    encoder_hidden_states,
+                    (encoder_hidden_states.shape[0], -
+                        1, encoder_hidden_states.shape[-1])
+                )
+            print(encoder_hidden_states.shape)
+            return encoder_hidden_states
+        
+
+
+        # print(batch["input_ids"].shape)
+        # train the small text encoder
+        encoder_text_embeddings = text_encoder_state.apply_fn(
+            input_ids=batch["input_ids_text_encoder_1"],
+            params=params["text_encoder"],
+            dropout_rng=dropout_rng,
+            train=True,
+            output_hidden_states=True
+        )
+
+        # large text encoder is frozen because i want to preserve the prior knowledge
+        # this chonky text encoder is good at natural language prompt
+        encoder_text_embeddings_2 = text_encoder_2(
+            input_ids=batch["input_ids_text_encoder_2"],
+            params=frozen_params["text_encoder_2"],
+            train=False,
+            output_hidden_states=True
+        )
+        # print(encoder_hidden_states.shape)
+
+        # grab second last hidden states from text embedding 1
+        encoder_text_embeddings = encoder_text_embeddings["hidden_states"][-2]
+        # concatenate procedure, automatic1111 way
+        encoder_text_embeddings  = _concatenate_text_encoder_latent(encoder_text_embeddings)
+        # grab MAE pooled embedding from text embedding 2 (used for aditional guidance alongside crop res guidance)
+        # since i use auto1111 guidane i just gonna average the pooled embeddings, ideally i modify the pooling before it got projected
+        # TODO: modify the embedding pooling instead of doing this weird weighted average
+        pooled_text_embeddings_2 = encoder_text_embeddings_2["text_embeds"].mean(axis=0)
+        pooled_text_embeddings_2 = jnp.expand_dims(pooled_text_embeddings_2, axis=0)
+        print(pooled_text_embeddings_2.shape)
+        # grab second last hidden states from text embedding 2
+        encoder_text_embeddings_2 = encoder_text_embeddings_2["hidden_states"][-2]
+        # concatenate procedure, automatic1111 way
+        encoder_text_embeddings_2  = _concatenate_text_encoder_latent(encoder_text_embeddings_2)
+
+        # combined embeddings is concatenated along hidden dimension axis so it has (sequence, 2048 hidden dim)
+        encoder_text_embeddings = jnp.concatenate([encoder_text_embeddings,encoder_text_embeddings_2], axis=-1)
+        
+        # resolution embeddings 
+        def _get_res_cond_to_time_proj(original_size, crops_coords_top_left, target_size, bs, dtype):
+            # original_size (h,w) crops_coords_top_left(t,l) target_size(h,w)
+            res_cond_to_time_proj = list(original_size + crops_coords_top_left + target_size)
+            res_cond_to_time_proj = jnp.array([res_cond_to_time_proj] * bs, dtype=dtype)
+            return res_cond_to_time_proj
+
+        # i wont do any kind of data anotation here just gonna grab the original res as guidance for now
+        res_cond_to_time_proj = _get_res_cond_to_time_proj(
+                original_size=(batch["pixel_values"].shape[2], batch["pixel_values"].shape[3]), # (height, width),
+                crops_coords_top_left=(0, 0), 
+                target_size=(batch["pixel_values"].shape[2], batch["pixel_values"].shape[3]), # (height, width),
+                bs=batch_size,# *2, # i forgot why i multiply this by 2 i guess it's due to 2 text embedding and i have to do double guidance
+                dtype=jnp.bfloat16 # should i use fp32 here hmmm, mebbe not it's not acumulating anything
+        )
+        
+        # additional guidance from pooling and resolution to be projected as time embedding 
+        added_cond_kwargs = {"text_embeds": pooled_text_embeddings_2, "time_ids": res_cond_to_time_proj}
         # Predict the noise residual because predicting image is hard :P
         # essentially try to undo the noise process
         model_pred = unet.apply(
-            {"params": params["unet"]},
-            noisy_latents,
-            timesteps,
-            encoder_hidden_states,
-            train=True
+            variables={"params": params["unet"]},
+            sample=noisy_latents,
+            timesteps=timesteps,
+            encoder_hidden_states=encoder_text_embeddings,
+            train=True,
+            added_cond_kwargs=added_cond_kwargs,
         ).sample
 
         # Get the target for loss depending on the prediction type
@@ -457,7 +531,7 @@ def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.
 
     # perform autograd
     grad_fn = jax.value_and_grad(compute_loss)
-    loss, grad = grad_fn(params)
+    loss, grad = grad_fn(params, frozen_params)
 
     # update weight and bias value
     new_unet_state = unet_state.apply_gradients(grads=grad["unet"])
@@ -477,9 +551,10 @@ def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.
 train_rngs = rng(2)
 # dummy batch input
 current_batch = {
-    'attention_mask': jnp.arange(2 * 1 * 3 * 77).reshape(2 * 1, 3, 77), 
-    'input_ids': jnp.arange(2 * 3 * 77).reshape(2 * 3, 77), 
-    'pixel_values': jax.random.uniform(train_rngs, shape=(2 * 1, 3, 512, 512))
+    'attention_mask': jnp.arange(1 * 1 * 3 * 77).reshape(1 * 1, 3, 77), 
+    'input_ids_text_encoder_1': jnp.arange(1 * 3 * 77).reshape(1 * 3, 77), 
+    'input_ids_text_encoder_2': jnp.arange(1 * 3 * 77).reshape(1 * 3, 77), 
+    'pixel_values': jax.random.uniform(train_rngs, shape=(1 * 1, 3, 1024, 1024))
 }
 # current_batch_shard_layout = {
 #     'attention_mask': sharding.replicate(), 
@@ -488,7 +563,8 @@ current_batch = {
 # }
 current_batch_shard_layout = {
     'attention_mask': NamedSharding(mesh, P()), 
-    'input_ids': NamedSharding(mesh, P()), 
+    'input_ids_text_encoder_1': NamedSharding(mesh, P()), 
+    'input_ids_text_encoder_2': NamedSharding(mesh, P()), 
     'pixel_values': NamedSharding(mesh, P()),
 }
 
@@ -499,6 +575,7 @@ p_train_step = jax.jit(
     in_shardings=(
         jax.tree_map(lambda x: shard_remainder_state_param(x), unet_state),
         jax.tree_map(lambda x: shard_remainder_state_param(x), text_encoder_state),
+        jax.tree_map(lambda x: shard_remainder_state_param(x), text_encoder_2_params),
         jax.tree_map(lambda x: shard_remainder_state_param(x), vae_params),
         current_batch_shard_layout,
         NamedSharding(mesh, P()),# sharding.replicate()
@@ -515,6 +592,15 @@ p_train_step = jax.jit(
 
 batch = jax.tree_map(
     lambda x: jax.device_put(x, device=sharding.replicate()), current_batch
+)
+
+unet_state, text_encoder_state, metrics, train_rngs = p_train_step(
+    unet_state,
+    text_encoder_state,
+    text_encoder_2_params,
+    vae_params,
+    batch,
+    train_rngs
 )
 
 unet_state, text_encoder_state, metrics, train_rngs = p_train_step(
