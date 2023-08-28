@@ -9,10 +9,11 @@ from diffusers import (
     FlaxAutoencoderKL,
     FlaxDPMSolverMultistepScheduler,
     FlaxStableDiffusionPipeline,
-    FlaxUNet2DConditionModel,
+    
 )
 
-from transformers import CLIPFeatureExtractor, CLIPTokenizer, FlaxCLIPTextModel, FlaxCLIPTextModelWithProjection
+from transformers import CLIPTokenizer
+from models import FlaxCLIPTextModel, FlaxCLIPTextModelWithProjection, FlaxUNet2DConditionModel
 
 import diffusers.schedulers.scheduling_ddim_flax
 
@@ -124,8 +125,8 @@ def t2i_inference(
     prompt_2: jnp.array,
     neg_prompt_2: jnp.array,
     seed: jax.random.KeyArray,
-    width: int = 1024,
-    height: int = 1024,
+    width: int = 1344,
+    height: int = 768,
     cfg: float = 7.5,
     num_inference_steps: int = 30,
 ):
@@ -174,7 +175,10 @@ def t2i_inference(
 
     # resolution embedding ??
     add_time_ids = _get_add_time_ids(
-            (1024, 1024), (0, 0), (1024, 1024), batch_size*2, dtype=jnp.bfloat16
+            (1344, 768), # (768, 1344),
+            (0, 0), 
+            (1344, 768), # (768, 1344),
+            batch_size*2, dtype=jnp.bfloat16
         )
 
     # concatenate both embedding as 1 and then we also need text encoder 2 embedding as separate input too
@@ -260,7 +264,7 @@ def t2i_inference(
     )
     return vae_outputs
 
-jax.profiler.start_trace("./tensorboard")
+# jax.profiler.start_trace("./tensorboard")
 t2i = jax.jit(t2i_inference)
 
 text_input = tokenizer(
@@ -301,5 +305,5 @@ image_np = np.array((image[0]*255).astype(jnp.uint8))
 image_pil = Image.fromarray(image_np)
 image_pil.save("test_non_shard.png")
 
-jax.profiler.stop_trace()
+# jax.profiler.stop_trace()
 print()
