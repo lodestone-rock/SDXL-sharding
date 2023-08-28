@@ -13,7 +13,8 @@ from diffusers import (
 )
 from models import FlaxUNet2DConditionModel
 
-from transformers import CLIPFeatureExtractor, CLIPTokenizer, FlaxCLIPTextModel
+from transformers import CLIPTokenizer
+from models import FlaxCLIPTextModel
 
 import diffusers.schedulers.scheduling_ddim_flax
 
