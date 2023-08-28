@@ -4,11 +4,12 @@ import ast
 import gc
 
 import jax
+import re
 import jaxlib
 import jax.numpy as jnp
 import numpy as np
 from PIL import Image
-from typing import Union
+from typing import Union, Any
 from PIL import Image
 import optax
 from flax.training import train_state
@@ -19,8 +20,8 @@ from diffusers import (
     FlaxStableDiffusionPipeline,
     # FlaxUNet2DConditionModel,
 )
-from models import FlaxUNet2DConditionModel
-from transformers import CLIPFeatureExtractor, CLIPTokenizer, FlaxCLIPTextModel
+from models import FlaxUNet2DConditionModel, FlaxCLIPTextModel, FlaxCLIPTextModelWithProjection
+from transformers import CLIPTokenizer
 
 import diffusers.schedulers.scheduling_ddim_flax
 
@@ -53,7 +54,7 @@ transformed_params = dict
 params = dict
 rng = jax.random.PRNGKey
 noise_scheduler_state = diffusers.schedulers.scheduling_ddim_flax.DDIMSchedulerState
-
+leaf = Any
 sharding = PositionalSharding(mesh_utils.create_device_mesh((jax.device_count(),)))
 use_offset_noise = False
 strip_bos_eos_token = True
@@ -77,6 +78,15 @@ def save_model_tree_as_json(file_name: str, params: dict) -> None:
     with open(file_name, "w") as json_file:
         json.dump(params, json_file)
 
+def create_flattened_tree_json(params:dict, name:str) -> None:
+    flattened_tree = flax.traverse_util.flatten_dict(params)
+    flattened_tree = jax.tree_map(shard_weight_column, flattened_tree)
+    flattened_tree_shape = jax.tree_map(lambda x: repr(x.shape), flattened_tree)
+    flattened_tree = jax.tree_map(lambda x: repr(x.sharding), flattened_tree)
+    flattened_tree = {".".join(key): values for key,values in flattened_tree.items()}
+    flattened_tree_shape = {".".join(key): values for key,values in flattened_tree_shape.items()}
+    save_model_tree_as_json(f"flattened_{name}_sharding.json", flattened_tree)
+    save_model_tree_as_json(f"flattened_{name}_shape.json", flattened_tree_shape)
 
 def shard_weight_column(model_params: jnp.array):
     device_count = jax.device_count()
@@ -154,11 +164,51 @@ def all_same_bool_values(d):
     return values
 
 
+# create a parameter path when i call this function using tree_map_with_path
+# usefull to define sharding behaviour for each param in the param tree or flax train state
+# stolen from EasyLM utils :P
+def tree_path_to_string(path:str, sep:str="."):
+    keys = []
+    for key in path:
+        if isinstance(key, jax.tree_util.SequenceKey):
+            keys.append(str(key.idx))
+        elif isinstance(key, jax.tree_util.DictKey):
+            keys.append(str(key.key))
+        elif isinstance(key, jax.tree_util.GetAttrKey):
+            keys.append(str(key.name))
+        elif isinstance(key, jax.tree_util.FlattenedIndexKey):
+            keys.append(str(key.key))
+        else:
+            keys.append(str(key))
+    if sep is None:
+        return tuple(keys)
+    return sep.join(keys)
 
-model_dir = "/home/teor/secondary_storage/tpu8/model/fluffyrock-576-704-832-960-1088-lion-e130"
+# regex match if the pattern exist from json 
+# used for applying sharding layour for each layer
+def shard_based_on_lut(lookup_dict: dict, param:tuple, sep:str=".") -> leaf:
+
+    param_path=tree_path_to_string(param[0], sep)
+    # param should be (tree_path, param_value)
+    leaf = None
+    for layer_path, sharding_layout in lookup_dict.items():
+        # check if the model layer path match 
+        # then shard accodring to the lookup table
+        match = bool(re.search(layer_path, param_path))
+        if match:
+            leaf = jax.device_put(param[1], device=sharding_layout)
+            break
+    # if not found just replicate it
+    # here it assumes that named sharding is already defined
+    if leaf == None:
+        leaf = jax.device_put(param[1], device=NamedSharding(mesh, P()))
+    return leaf
+
+model_dir = "/home/teor/secondary_storage/SDXL-sharding/stable-diffusion-xl-base-1.0-flax"
 # load the model params and model object
 
 tokenizer = CLIPTokenizer.from_pretrained(model_dir, subfolder="tokenizer")
+tokenizer_2 = CLIPTokenizer.from_pretrained(model_dir, subfolder="tokenizer_2")
 
 unet, unet_params = FlaxUNet2DConditionModel.from_pretrained(
     model_dir, subfolder="unet", dtype=jnp.bfloat16, use_memory_efficient=True
@@ -167,6 +217,11 @@ unet, unet_params = FlaxUNet2DConditionModel.from_pretrained(
 text_encoder, text_encoder_params = FlaxCLIPTextModel.from_pretrained(
     model_dir, subfolder="text_encoder", dtype=jnp.bfloat16, _do_init=False
 )
+
+text_encoder_2, text_encoder_2_params = FlaxCLIPTextModelWithProjection.from_pretrained(
+    model_dir, subfolder="text_encoder", dtype=jnp.bfloat16, _do_init=False
+)
+
 
 vae, vae_params = FlaxAutoencoderKL.from_pretrained(
     model_dir,
@@ -179,7 +234,7 @@ noise_scheduler = FlaxDDPMScheduler(
     beta_end=0.012,
     beta_schedule="scaled_linear",
     num_train_timesteps=1000,
-    prediction_type="v_prediction",
+    # prediction_type="v_prediction",
 )
 
 noise_scheduler_state = noise_scheduler.create_state()
@@ -190,21 +245,24 @@ noise_scheduler_state = noise_scheduler.create_state()
 # vae_params = jax.tree_map(shard_weight_column, vae_params)
 
 # grab tree sharding layout for each layer
-unet_params_shard_layout = read_json_file("unet_sharding_layout.json")
-text_encoder_shard_layout = read_json_file("clip_sharding_layout.json")
-vae_params_shard_layout = read_json_file("vae_sharding_layout.json")
+unet_params_shard_layout = read_json_file("flattened_unet_xl_sharding.json")
+text_encoder_shard_layout = read_json_file("flattened_clip_xl_sharding.json")
+text_encoder_2_shard_layout = read_json_file("flattened_openclip_xl_sharding.json")
+vae_params_shard_layout = read_json_file("flattened_vae_xl_sharding.json")
 
 unet_params_shard_layout = predefined_mesh_sharding(unet_params_shard_layout)
 text_encoder_shard_layout = predefined_mesh_sharding(text_encoder_shard_layout)
+text_encoder_2_shard_layout = predefined_mesh_sharding(text_encoder_2_shard_layout)
 vae_params_shard_layout = predefined_mesh_sharding(vae_params_shard_layout)
 
 # jax.profiler.start_trace("./tensorboard")
 
 # NOTE: there's must be a way to define shard without materializing this to TPU!
 # init the state in cpu first then manually shard the state perhaps hmmm
-unet_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), unet_params, unet_params_shard_layout)
-text_encoder_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), text_encoder_params, text_encoder_shard_layout)
-vae_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), vae_params, vae_params_shard_layout)
+# unet_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), unet_params, unet_params_shard_layout)
+# text_encoder_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), text_encoder_params, text_encoder_shard_layout)
+# vae_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), vae_params, vae_params_shard_layout)
+
 
 u_net_constant_scheduler = optax.constant_schedule(
     u_net_learning_rate / adam_to_lion_scale_factor
@@ -250,10 +308,16 @@ text_encoder_state = train_state.TrainState.create(
     tx=text_encoder_optimizer
 )
 
+# trained
+unet_state = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(unet_params_shard_layout, (path, leaf)),unet_state)
+text_encoder_state = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(text_encoder_shard_layout, (path, leaf)),text_encoder_state)
+# not trained
+text_encoder_2_params = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(text_encoder_2_shard_layout, (path, leaf)),text_encoder_2_params)
+vae_params = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(vae_params_shard_layout, (path, leaf)),vae_params)
 # delete previous params because state creates a copy of it and occupy a memory
-del unet_params
-del text_encoder_params
-gc.collect()
+# del unet_params
+# del text_encoder_params
+# gc.collect()
 
 def train_step(unet_state, text_encoder_state, vae_params, batch, train_rng:jax.random.PRNGKey):
     # generate rng and return new_train_rng to be used for the next iteration step
