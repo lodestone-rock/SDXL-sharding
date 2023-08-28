@@ -8,3 +8,7 @@ __pycache__
 !clip_sharding_layout.json
 !unet_sharding_layout.json
 !vae_sharding_layout.json
+!flattened_openclip_xl_sharding.json
+!flattened_clip_xl_sharding.json
+!flattened_vae_xl_sharding.json
+!flattened_unet_xl_sharding.json
