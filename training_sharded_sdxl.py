@@ -13,6 +13,8 @@ from typing import Union, Any
 from PIL import Image
 import optax
 from flax.training import train_state
+import flax
+import partition_pattern
 
 from diffusers import (
     FlaxAutoencoderKL,
@@ -81,6 +83,15 @@ def save_model_tree_as_json(file_name: str, params: dict) -> None:
 def create_flattened_tree_json(params:dict, name:str) -> None:
     flattened_tree = flax.traverse_util.flatten_dict(params)
     flattened_tree = jax.tree_map(shard_weight_column, flattened_tree)
+    flattened_tree_shape = jax.tree_map(lambda x: repr(x.shape), flattened_tree)
+    flattened_tree = jax.tree_map(lambda x: repr(x.sharding), flattened_tree)
+    flattened_tree = {".".join(key): values for key,values in flattened_tree.items()}
+    flattened_tree_shape = {".".join(key): values for key,values in flattened_tree_shape.items()}
+    save_model_tree_as_json(f"flattened_{name}_sharding.json", flattened_tree)
+    save_model_tree_as_json(f"flattened_{name}_shape.json", flattened_tree_shape)
+
+def debug_tree_json(params:dict, name:str) -> None:
+    flattened_tree = flax.traverse_util.flatten_dict(params)
     flattened_tree_shape = jax.tree_map(lambda x: repr(x.shape), flattened_tree)
     flattened_tree = jax.tree_map(lambda x: repr(x.sharding), flattened_tree)
     flattened_tree = {".".join(key): values for key,values in flattened_tree.items()}
@@ -186,21 +197,22 @@ def tree_path_to_string(path:str, sep:str="."):
 
 # regex match if the pattern exist from json 
 # used for applying sharding layour for each layer
-def shard_based_on_lut(lookup_dict: dict, param:tuple, sep:str=".") -> leaf:
+def shard_based_on_lut(lookup_list: list, param:tuple, sep:str=".") -> leaf:
 
     param_path=tree_path_to_string(param[0], sep)
     # param should be (tree_path, param_value)
     leaf = None
-    for layer_path, sharding_layout in lookup_dict.items():
+    for layer_path, sharding_layout in lookup_list:
         # check if the model layer path match 
         # then shard accodring to the lookup table
         match = bool(re.search(layer_path, param_path))
         if match:
-            leaf = jax.device_put(param[1], device=sharding_layout)
+            leaf = jax.device_put(param[1], device=NamedSharding(mesh, P(*sharding_layout)))
             break
     # if not found just replicate it
     # here it assumes that named sharding is already defined
     if leaf == None:
+        print(param_path)
         leaf = jax.device_put(param[1], device=NamedSharding(mesh, P()))
     return leaf
 
@@ -211,7 +223,7 @@ tokenizer = CLIPTokenizer.from_pretrained(model_dir, subfolder="tokenizer")
 tokenizer_2 = CLIPTokenizer.from_pretrained(model_dir, subfolder="tokenizer_2")
 
 unet, unet_params = FlaxUNet2DConditionModel.from_pretrained(
-    model_dir, subfolder="unet", dtype=jnp.bfloat16, use_memory_efficient=True
+    model_dir, subfolder="unet", dtype=jnp.bfloat16, use_memory_efficient=False
 )
 
 text_encoder, text_encoder_params = FlaxCLIPTextModel.from_pretrained(
@@ -239,29 +251,8 @@ noise_scheduler = FlaxDDPMScheduler(
 
 noise_scheduler_state = noise_scheduler.create_state()
 
-# shard the weights across device
-# unet_params = jax.tree_map(shard_weight_column, unet_params)
-# text_encoder_params = jax.tree_map(shard_weight_column, text_encoder_params)
-# vae_params = jax.tree_map(shard_weight_column, vae_params)
-
-# grab tree sharding layout for each layer
-unet_params_shard_layout = read_json_file("flattened_unet_xl_sharding.json")
-text_encoder_shard_layout = read_json_file("flattened_clip_xl_sharding.json")
-text_encoder_2_shard_layout = read_json_file("flattened_openclip_xl_sharding.json")
-vae_params_shard_layout = read_json_file("flattened_vae_xl_sharding.json")
-
-unet_params_shard_layout = predefined_mesh_sharding(unet_params_shard_layout)
-text_encoder_shard_layout = predefined_mesh_sharding(text_encoder_shard_layout)
-text_encoder_2_shard_layout = predefined_mesh_sharding(text_encoder_2_shard_layout)
-vae_params_shard_layout = predefined_mesh_sharding(vae_params_shard_layout)
 
 # jax.profiler.start_trace("./tensorboard")
-
-# NOTE: there's must be a way to define shard without materializing this to TPU!
-# init the state in cpu first then manually shard the state perhaps hmmm
-# unet_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), unet_params, unet_params_shard_layout)
-# text_encoder_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), text_encoder_params, text_encoder_shard_layout)
-# vae_params = jax.tree_map(lambda params, layout: jax.device_put(params, device=layout), vae_params, vae_params_shard_layout)
 
 
 u_net_constant_scheduler = optax.constant_schedule(
@@ -309,11 +300,13 @@ text_encoder_state = train_state.TrainState.create(
 )
 
 # trained
-unet_state = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(unet_params_shard_layout, (path, leaf)),unet_state)
-text_encoder_state = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(text_encoder_shard_layout, (path, leaf)),text_encoder_state)
+unet_state = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(partition_pattern.unet_partition, (path, leaf)),unet_state)
+text_encoder_state = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(partition_pattern.clip_partition, (path, leaf)),text_encoder_state)
 # not trained
-text_encoder_2_params = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(text_encoder_2_shard_layout, (path, leaf)),text_encoder_2_params)
-vae_params = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(vae_params_shard_layout, (path, leaf)),vae_params)
+text_encoder_2_params = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(partition_pattern.clip_partition, (path, leaf)),text_encoder_2_params)
+# vae_params = jax.tree_util.tree_map_with_path(lambda path, leaf: shard_based_on_lut(vae_params_shard_layout, (path, leaf)),vae_params)
+# replicate vae for now, i think xla is gud at merging this shitton conv ops
+vae_params = jax.tree_util.tree_map(lambda leaf: jax.device_put(leaf, device=NamedSharding(mesh, P())),vae_params)
 # cast as bf16 since it's not trained
 text_encoder_2_params = jax.tree_map(lambda leaf: leaf.astype(jnp.bfloat16),text_encoder_2_params)
 vae_params = jax.tree_map(lambda leaf: leaf.astype(jnp.bfloat16),vae_params)
@@ -603,13 +596,20 @@ unet_state, text_encoder_state, metrics, train_rngs = p_train_step(
     train_rngs
 )
 
-unet_state, text_encoder_state, metrics, train_rngs = p_train_step(
-    unet_state,
-    text_encoder_state,
-    vae_params,
-    batch,
-    train_rngs
-)
 # jax.profiler.stop_trace()
 
+
+# import time
+# for x in range(100):
+#     start = time.time()
+#     unet_state, text_encoder_state, metrics, train_rngs = p_train_step(
+#         unet_state,
+#         text_encoder_state,
+#         text_encoder_2_params,
+#         vae_params,
+#         batch,
+#         train_rngs
+#     )
+#     stop = time.time()
+#     print(metrics, stop-start)
 print()
