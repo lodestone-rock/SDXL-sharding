@@ -98,7 +98,7 @@ unet_partition = [
 clip_partition = [
     # embbeding layer
     ("text_model.embeddings.token_embedding.embedding", ('mp', None)),
-    ("text_model.embeddings.position_embedding.embedding", ('mp', None)),
+    ("text_model.embeddings.position_embedding.embedding", (None, None)), # sucky text embedding has 77 dim WHY!!!
 
     # attention blocks
     ("text_model.encoder.layers.\d+.layer_norm1.scale", (None,)),
